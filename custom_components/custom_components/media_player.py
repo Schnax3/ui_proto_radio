@@ -35,16 +35,12 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
     def __init__(self, host):
         """Initialize the radio."""
         self._host = host
-        self._name = "Internetradio"
+        self._attr_name = "Internetradio"
         self._state = STATE_IDLE
         self._volume = 0.5
         self._muted = False
         self._source = None
         self._media_title = None
-
-    @property
-    def name(self):
-        return self._name
 
     @property
     def state(self):
@@ -72,12 +68,13 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
 
     @property
     def supported_features(self):
+        """Return the supported features."""
         return (
             MediaPlayerEntityFeature.TURN_ON
             | MediaPlayerEntityFeature.TURN_OFF
             | MediaPlayerEntityFeature.VOLUME_SET
             | MediaPlayerEntityFeature.VOLUME_STEP
-            | MediaPlayerEntityFeature.MUTING
+            | MediaPlayerEntityFeature.VOLUME_MUTE
             | MediaPlayerEntityFeature.SELECT_SOURCE
             | MediaPlayerEntityFeature.PLAY
             | MediaPlayerEntityFeature.PAUSE
