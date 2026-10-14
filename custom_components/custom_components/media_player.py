@@ -27,20 +27,32 @@ SOURCE_MAPPING = {
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up UIProto Radio platform from a config entry (UI)."""
     host = entry.data[CONF_HOST]
-    async_add_entities([UIProtoRadioPlayer(host)], True)
+    async_add_entities([UIProtoRadioPlayer(host, entry.entry_id)], True)
 
 class UIProtoRadioPlayer(MediaPlayerEntity):
     """Representation of a UIProto Internet Radio."""
 
-    def __init__(self, host):
+    def __init__(self, host, entry_id):
         """Initialize the radio."""
         self._host = host
         self._attr_name = "Internetradio"
+        self._attr_unique_id = f"{entry_id}_internet_radio"
         self._state = STATE_IDLE
         self._volume = 0.5
         self._muted = False
         self._source = None
         self._media_title = None
+
+    @property
+    def device_info(self):
+        """Return device information about this radio."""
+        return {
+            "identifiers": {(DOMAIN, self._host)},
+            "name": "UIProto Internet Radio",
+            "manufacturer": "MediaYou / OEM",
+            "model": "UIProto Streaming Radio",
+            "sw_version": "j61120190611h",
+        }
 
     @property
     def state(self):
