@@ -23,14 +23,20 @@ _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=15)
 
-# --- Tastencodes (Sendkey). Pro Modell verschieden, hier zentral anpassbar ---
-KEY_POWER = 7          # von dir gefunden (Toggle)
+# --- Tastencodes (Sendkey) ---
+KEY_HOME = 1
+KEY_UP = 2
+KEY_DOWN = 3
+KEY_LEFT = 4
+KEY_RIGHT = 5
+KEY_SELECT = 6
+KEY_POWER = 7          # Toggle
 KEY_MUTE = 8
 KEY_VOL_UP = 9
 KEY_VOL_DOWN = 10
-KEY_PLAY_PAUSE = 29    # Toggle laut KINGS-Tabelle (unverifiziert beim Sidney)
-KEY_NEXT = 31          # unverifiziert
-KEY_PREV = 32          # unverifiziert
+KEY_PLAY_PAUSE = 29    # Toggle
+KEY_NEXT = 31          
+KEY_PREV = 32          
 
 MAX_VOLUME = 31
 
@@ -48,23 +54,22 @@ SOURCE_MAPPING = {
     "my mediaU": 51,
 }
 
-# sid-Werte aus <playinfo> (Doku zu einem Lenco-Radio, beim Sidney unverifiziert)
 SID_STATES = {
-    "1": MediaPlayerState.IDLE,        # nicht spielend
-    "2": MediaPlayerState.BUFFERING,   # buffering
-    "5": MediaPlayerState.BUFFERING,   # Buffer 100 %
-    "6": MediaPlayerState.PLAYING,     # spielt
-    "7": MediaPlayerState.IDLE,        # Wiedergabe endet
-    "9": MediaPlayerState.PAUSED,      # pausiert
-    "12": MediaPlayerState.BUFFERING,  # liest Datei
-    "14": MediaPlayerState.IDLE,       # Verbindung fehlgeschlagen
+    "1": MediaPlayerState.IDLE,
+    "2": MediaPlayerState.BUFFERING,
+    "5": MediaPlayerState.BUFFERING,
+    "6": MediaPlayerState.PLAYING,
+    "7": MediaPlayerState.IDLE,
+    "9": MediaPlayerState.PAUSED,
+    "12": MediaPlayerState.BUFFERING,
+    "14": MediaPlayerState.IDLE,
 }
 
 STATION_ID = re.compile(r"^\d+_\d+$")
 
 
 def _tag(text: str, name: str) -> str | None:
-    """Wert eines XML-ähnlichen Tags lesen (das Radio escaped Sonderzeichen nicht)."""
+    """Wert eines XML-ähnlichen Tags lesen."""
     match = re.search(rf"<{name}>(.*?)</{name}>", text, re.S | re.I)
     return match.group(1).strip() if match else None
 
@@ -72,7 +77,21 @@ def _tag(text: str, name: str) -> str | None:
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up UIProto Radio platform from a config entry (UI)."""
     host = entry.data[CONF_HOST]
-    async_add_entities([UIProtoRadioPlayer(host, entry.entry_id)], True)
+    player = UIProtoRadioPlayer(host, entry.entry_id)
+    async_add_entities([player], True)
+
+    # Service registrieren, damit Tasten per Dienstaufruf gesendet werden können
+    if not hass.services.has_service(DOMAIN, "send_key"):
+        async def async_send_key_service(call):
+            entity_id = call.data.get("entity_id")
+            key = call.data.get("key")
+            
+            # Alle Entitäten dieser Integration durchgehen
+            for entity in hass.data.get(f"{DOMAIN}_entities", []):
+                if not entity_id or entity.entity_id == entity_id:
+                    await entity.async_send_key(key)
+
+        hass.services.async_register(DOMAIN, "send_key", async_send_key_service)
 
 
 class UIProtoRadioPlayer(MediaPlayerEntity):
@@ -108,6 +127,18 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self._attr_media_artist = None
         self._attr_media_channel = None
 
+    async def async_added_to_hass(self):
+        """Register entity to hass data for service calls."""
+        await super().async_added_to_hass()
+        self.hass.data.setdefault(f"{DOMAIN}_entities", []).append(self)
+
+    async def async_will_remove_from_hass(self):
+        """Remove entity from hass data."""
+        await super().async_will_remove_from_hass()
+        entities = self.hass.data.get(f"{DOMAIN}_entities", [])
+        if self in entities:
+            entities.remove(self)
+
     @property
     def device_info(self):
         """Return device information about this radio."""
@@ -119,11 +150,8 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
             "sw_version": "j61120190611h",
         }
 
-    # ------------------------------------------------------------------
-    # Hilfsfunktionen
-    # ------------------------------------------------------------------
     async def _get(self, path: str) -> str | None:
-        """GET-Anfrage ans Radio. Gibt None zurück, wenn es nicht antwortet."""
+        """GET-Anfrage ans Radio."""
         url = f"http://{self._host}{path}"
         try:
             session = async_get_clientsession(self.hass)
@@ -150,7 +178,6 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         return result
 
     async def _refresh(self, delay: float = 1.0) -> None:
-        """Kurz warten, dann Status neu lesen und in HA anzeigen."""
         await asyncio.sleep(delay)
         await self.async_update()
         self.async_write_ha_state()
@@ -160,9 +187,6 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self._attr_media_artist = None
         self._attr_media_channel = None
 
-    # ------------------------------------------------------------------
-    # Ein / Aus (Taste 7 ist ein Toggle, darum nur senden, wenn nötig)
-    # ------------------------------------------------------------------
     async def async_turn_on(self):
         if self._attr_state != MediaPlayerState.OFF:
             return
@@ -175,9 +199,6 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         await self.async_send_key(KEY_POWER)
         await self._refresh(3)
 
-    # ------------------------------------------------------------------
-    # Lautstärke
-    # ------------------------------------------------------------------
     async def async_volume_up(self):
         await self.async_send_key(KEY_VOL_UP)
         await self._refresh()
@@ -199,9 +220,6 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self._attr_is_volume_muted = mute
         self.async_write_ha_state()
 
-    # ------------------------------------------------------------------
-    # Quelle und Sender
-    # ------------------------------------------------------------------
     async def async_select_source(self, source):
         if source in SOURCE_MAPPING:
             await self.async_send_gochild(SOURCE_MAPPING[source])
@@ -209,22 +227,14 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
             self.async_write_ha_state()
 
     async def async_play_media(self, media_type, media_id, **kwargs):
-        """Sender per ID abspielen, z. B. media_id: "91_6" (Menü-ID_Nummer)."""
         media_id = str(media_id).strip()
         if not STATION_ID.match(media_id):
-            _LOGGER.error(
-                "Ungültige Sender-ID %s (erwartet z. B. 91_6)", media_id
-            )
             return
-        # Erst in das passende Menü wechseln, sonst kann das Radio hängen bleiben
         await self.async_send_gochild(media_id.split("_")[0])
         await asyncio.sleep(1)
         await self._get(f"/play_stn?id={media_id}")
         await self._refresh(2)
 
-    # ------------------------------------------------------------------
-    # Wiedergabe
-    # ------------------------------------------------------------------
     async def async_media_play(self):
         if self._attr_state == MediaPlayerState.PLAYING:
             return
@@ -249,13 +259,9 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         await self.async_send_key(KEY_PREV)
         await self._refresh()
 
-    # ------------------------------------------------------------------
-    # Status lesen
-    # ------------------------------------------------------------------
     async def async_update(self):
         text = await self._get("/playinfo")
         if text is None:
-            # Keine Antwort: Standby oder nicht erreichbar (nicht unterscheidbar)
             self._attr_state = MediaPlayerState.OFF
             self._clear_media()
             return
