@@ -10,6 +10,7 @@ send_key:
         entity:
           integration: ui_proto_radio
           domain: media_player
+
     key:
       name: Tastencode
       description: Der numerische Tastencode, der an das Radio gesendet wird.
