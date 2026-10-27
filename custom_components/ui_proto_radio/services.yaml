@@ -1,0 +1,21 @@
+send_key:
+name: Send key
+description: Sendet einen Tastencode an das UIProto-Internetradio.
+fields:
+entity_id:
+name: Radio
+description: Das Radio, an das der Tastendruck gesendet wird.
+required: false
+selector:
+entity:
+integration: ui_proto_radio
+domain: media_player
+key:
+name: Tastencode
+description: Der numerische Tastencode, der an das Radio gesendet wird.
+required: true
+selector:
+number:
+min: 1
+max: 32
+mode: box
