@@ -1,2 +1,2 @@
-DOMAIN = "ui_proto_radio"
+DOMAIN = "integration"
 DEFAULT_HOST = "192.168.178"
