@@ -221,10 +221,16 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_select_source(self, source):
+        """Quelle umschalten (wie der erfolgreiche Test)."""
         if source in SOURCE_MAPPING:
-            await self.async_send_gochild(SOURCE_MAPPING[source])
+            source_id = SOURCE_MAPPING[source]
+            # 1. Erst Home-Taste senden, damit das Radio im Hauptmenü ist
+            await self.async_send_key(KEY_HOME)
+            await asyncio.sleep(0.4)
+            # 2. Dann die gewünschte Quelle aufrufen
+            await self.async_send_gochild(source_id)
             self._attr_source = source
-            self.async_write_ha_state()
+            await self._refresh(1)
 
     async def async_play_media(self, media_type, media_id, **kwargs):
         media_id = str(media_id).strip()
