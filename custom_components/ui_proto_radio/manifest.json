@@ -10,5 +10,7 @@
   "issue_tracker": "https://github.com/Schnax3/ui_proto_radio/issues",
   "requirements": [],
   "version": "1.0.0",
- "categories": ["media_players"]
+"categories": [
+  "media_entertainment"
+]
 }
