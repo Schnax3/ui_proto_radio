@@ -1,0 +1,19 @@
+{
+  "model_name": "Standard MediaYou Radio",
+  "keys": {
+    "home": 1,
+    "up": 2,
+    "down": 3,
+    "left": 4,
+    "right": 5,
+    "select": 6,
+    "power": 7,
+    "mute": 8,
+    "vol_up": 9,
+    "vol_down": 10,
+    "play_pause": 29,
+    "stop": 28,
+    "next": 31,
+    "prev": 32
+  }
+}
