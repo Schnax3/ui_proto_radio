@@ -39,3 +39,7 @@ Eine moderne, lokal arbeitende Home Assistant Custom Integration für Internetra
 ## Dashboard-Empfehlung
 
 Für die optimale Steuerung empfiehlt sich eine maßgeschneiderte `custom:button-card`-Fernbedienung im Dashboard, die alle Schnellzugriffe auf Quellen und Navigation direkt bereitstellt.
+
+##
+Thanks, to erveryone that helped my build this Project
+@My Brother
