@@ -1,11 +1,12 @@
-"""Media-Player für UIProto/AirMusic-Internetradios (MediaYou)."""
+"""Media-Player für UIProto/AirMusic-Internetradios (MediaYou) mit dynamischer JSON-Konfiguration."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import re
 from datetime import timedelta
-
 import aiohttp
 
 from homeassistant.components.media_player import (
@@ -22,22 +23,6 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=15)
-
-# --- Tastencodes (Sendkey) ---
-KEY_HOME = 1
-KEY_UP = 2
-KEY_DOWN = 3
-KEY_LEFT = 4
-KEY_RIGHT = 5
-KEY_SELECT = 6
-KEY_POWER = 7          # Toggle
-KEY_MUTE = 8
-KEY_VOL_UP = 9
-KEY_VOL_DOWN = 10
-KEY_PLAY_PAUSE = 29    # Toggle
-KEY_NEXT = 31          
-KEY_PREV = 32          
-
 MAX_VOLUME = 31
 
 SOURCE_MAPPING = {
@@ -68,6 +53,31 @@ SID_STATES = {
 STATION_ID = re.compile(r"^\d+_\d+$")
 
 
+def load_radio_config(model_identifier: str | None = None) -> dict:
+    """Lädt die passende JSON-Konfiguration basierend auf dem erkannten Modell."""
+    config_dir = os.path.join(os.path.dirname(__file__), "configs")
+    
+    # Bestimme Dateinamen anhand des Modells
+    file_name = "default.json"
+    if model_identifier and "sidney" in model_identifier.lower():
+        file_name = "sidney.json"
+    elif model_identifier and "dabman" in model_identifier.lower():
+        file_name = "sidney.json"  # Nutzt gleiches Mapping
+
+    file_path = os.path.join(config_dir, file_name)
+    if not os.path.exists(file_path):
+        file_path = os.path.join(config_dir, "default.json")
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            _LOGGER.info("UIProto Radio: Konfiguration geladen aus %s", file_name)
+            return data
+    except Exception as err:
+        _LOGGER.error("Fehler beim Laden der Radio-Konfiguration: %s", err)
+        return {"keys": {"power": 7, "mute": 8, "vol_up": 9, "vol_down": 10}}
+
+
 def _tag(text: str, name: str) -> str | None:
     """Wert eines XML-ähnlichen Tags lesen."""
     match = re.search(rf"<{name}>(.*?)</{name}>", text, re.S | re.I)
@@ -77,16 +87,35 @@ def _tag(text: str, name: str) -> str | None:
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up UIProto Radio platform from a config entry (UI)."""
     host = entry.data[CONF_HOST]
-    player = UIProtoRadioPlayer(host, entry.entry_id)
+    
+    # Vorläufiger Client, um Modellinformationen (/init oder /irdevice.xml) abzufragen
+    session = async_get_clientsession(hass)
+    detected_model = "default"
+    
+    try:
+        async with session.get(f"http://{host}/irdevice.xml", timeout=aiohttp.ClientTimeout(total=3)) as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                detected_model = _tag(text, "friendlyName") or "default"
+    except Exception:
+        try:
+            async with session.get(f"http://{host}/init?language=de", timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                if resp.status == 200:
+                    detected_model = "sidney"  # Fallback bei erfolgreichem /init
+        except Exception:
+            pass
+
+    # Passende Konfiguration laden
+    radio_config = load_radio_config(detected_model)
+
+    player = UIProtoRadioPlayer(host, entry.entry_id, radio_config)
     async_add_entities([player], True)
 
-    # Service registrieren, damit Tasten per Dienstaufruf gesendet werden können
+    # Service registrieren
     if not hass.services.has_service(DOMAIN, "send_key"):
         async def async_send_key_service(call):
             entity_id = call.data.get("entity_id")
             key = call.data.get("key")
-            
-            # Alle Entitäten dieser Integration durchgehen
             for entity in hass.data.get(f"{DOMAIN}_entities", []):
                 if not entity_id or entity.entity_id == entity_id:
                     await entity.async_send_key(key)
@@ -113,9 +142,11 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         | MediaPlayerEntityFeature.PLAY_MEDIA
     )
 
-    def __init__(self, host, entry_id):
-        """Initialize the radio."""
+    def __init__(self, host, entry_id, config):
+        """Initialize the radio with dynamic config."""
         self._host = host
+        self._config = config
+        self._keys = config.get("keys", {})
         self._attr_name = "Internetradio"
         self._attr_unique_id = f"{entry_id}_internet_radio"
         self._attr_state = MediaPlayerState.IDLE
@@ -128,12 +159,10 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self._attr_media_channel = None
 
     async def async_added_to_hass(self):
-        """Register entity to hass data for service calls."""
         await super().async_added_to_hass()
         self.hass.data.setdefault(f"{DOMAIN}_entities", []).append(self)
 
     async def async_will_remove_from_hass(self):
-        """Remove entity from hass data."""
         await super().async_will_remove_from_hass()
         entities = self.hass.data.get(f"{DOMAIN}_entities", [])
         if self in entities:
@@ -141,37 +170,41 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
 
     @property
     def device_info(self):
-        """Return device information about this radio."""
         return {
             "identifiers": {(DOMAIN, self._host)},
-            "name": "UIProto Internet Radio",
+            "name": f"UIProto ({self._config.get('model_name', 'Radio')})",
             "manufacturer": "MediaYou / OEM",
             "model": "UIProto Streaming Radio",
             "sw_version": "j61120190611h",
         }
 
     async def _get(self, path: str) -> str | None:
-        """GET-Anfrage ans Radio."""
         url = f"http://{self._host}{path}"
         try:
             session = async_get_clientsession(self.hass)
             async with session.get(
-                url, timeout=aiohttp.ClientTimeout(total=5)
+                url, timeout=aiohttp.ClientTimeout(total=5), headers={"Connection": "close"}
             ) as response:
                 return await response.text(errors="ignore")
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.debug("Radio %s antwortet nicht (%s): %s", self._host, path, err)
             return None
 
+    async def async_send_key_name(self, key_name: str):
+        """Sendet eine Taste anhand ihres Namens aus der JSON-Config."""
+        key_code = self._keys.get(key_name)
+        if key_code is not None:
+            await self.async_send_key(key_code)
+        else:
+            _LOGGER.warning("Taste '%s' ist in der Config nicht definiert", key_name)
+
     async def async_send_key(self, key):
-        """Send key command to radio."""
         result = await self._get(f"/Sendkey?key={key}")
         if result is None:
             _LOGGER.warning("Taste %s konnte nicht gesendet werden", key)
         return result
 
     async def async_send_gochild(self, child_id):
-        """Send gochild command to radio."""
         result = await self._get(f"/gochild?id={child_id}")
         if result is None:
             _LOGGER.warning("gochild %s konnte nicht gesendet werden", child_id)
@@ -190,21 +223,21 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
     async def async_turn_on(self):
         if self._attr_state != MediaPlayerState.OFF:
             return
-        await self.async_send_key(KEY_POWER)
+        await self.async_send_key_name("power")
         await self._refresh(3)
 
     async def async_turn_off(self):
         if self._attr_state == MediaPlayerState.OFF:
             return
-        await self.async_send_key(KEY_POWER)
+        await self.async_send_key_name("power")
         await self._refresh(3)
 
     async def async_volume_up(self):
-        await self.async_send_key(KEY_VOL_UP)
+        await self.async_send_key_name("vol_up")
         await self._refresh()
 
     async def async_volume_down(self):
-        await self.async_send_key(KEY_VOL_DOWN)
+        await self.async_send_key_name("vol_down")
         await self._refresh()
 
     async def async_set_volume_level(self, volume):
@@ -221,13 +254,10 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_select_source(self, source):
-        """Quelle umschalten (wie der erfolgreiche Test)."""
         if source in SOURCE_MAPPING:
             source_id = SOURCE_MAPPING[source]
-            # 1. Erst Home-Taste senden, damit das Radio im Hauptmenü ist
-            await self.async_send_key(KEY_HOME)
+            await self.async_send_key_name("home")
             await asyncio.sleep(0.4)
-            # 2. Dann die gewünschte Quelle aufrufen
             await self.async_send_gochild(source_id)
             self._attr_source = source
             await self._refresh(1)
@@ -244,13 +274,13 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
     async def async_media_play(self):
         if self._attr_state == MediaPlayerState.PLAYING:
             return
-        await self.async_send_key(KEY_PLAY_PAUSE)
+        await self.async_send_key_name("play_pause")
         await self._refresh()
 
     async def async_media_pause(self):
         if self._attr_state != MediaPlayerState.PLAYING:
             return
-        await self.async_send_key(KEY_PLAY_PAUSE)
+        await self.async_send_key_name("play_pause")
         await self._refresh()
 
     async def async_media_stop(self):
@@ -258,11 +288,11 @@ class UIProtoRadioPlayer(MediaPlayerEntity):
         await self._refresh()
 
     async def async_media_next_track(self):
-        await self.async_send_key(KEY_NEXT)
+        await self.async_send_key_name("next")
         await self._refresh()
 
     async def async_media_previous_track(self):
-        await self.async_send_key(KEY_PREV)
+        await self.async_send_key_name("prev")
         await self._refresh()
 
     async def async_update(self):
