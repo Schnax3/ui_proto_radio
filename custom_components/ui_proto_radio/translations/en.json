@@ -1,0 +1,12 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to UIProto Radio",
+        "data": {
+          "host": "Host"
+        }
+      }
+    }
+  }
+}
