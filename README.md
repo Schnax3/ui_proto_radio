@@ -1,45 +1,52 @@
-# UIProto Internet Radio für Home Assistant
+# UIProto Internet Radio for Home Assistant
 
-Eine moderne, lokal arbeitende Home Assistant Custom Integration für Internetradios mit MediaYou / UIProto-Firmware (getestet mit Firmware `j61120190611h`).
+A modern, locally operating Home Assistant custom integration for internet radios with MediaYou / UIProto firmware (tested with firmware `j61120190611h`).
 
 ## Features
 
-* **Vollständiger Media Player:** Steuerung von Power, Lautstärke, Mute, Wiedergabe und Pause direkt über eine native Home Assistant Entität (`media_player.internetradio`).
-* **Config Flow (UI-Einrichtung):** Keine manuellen Einträge in der `configuration.yaml` nötig – füge das Radio bequem über die Benutzeroberfläche hinzu.
-* **Quellen-Umschaltung:** Nahtloser Wechsel zwischen allen wichtigen Quellen (Internet Radio, Spotify Connect, Media-Center, UPnP, USB, Bluetooth, AUX u.v.m.).
-* **Geräte- & Entitätsverwaltung:** Saubere Einbindung als vollwertiges Gerät inklusive eindeutiger `unique_id` und Geräteinformationen.
-* **Modernes Branding:** Inklusive eigenem Logo für eine nahtlose Optik in Home Assistant.
+* **Full Media Player:** Control power, volume, mute, playback, and pause directly through a native Home Assistant entity (`media_player.internetradio`).
+* **Config Flow (UI Setup):** No manual entries in `configuration.yaml` required – simply add your radio through the Home Assistant user interface.
+* **Source Switching:** Seamlessly switch between all major sources (Internet Radio, Spotify Connect, Media Center, UPnP, USB, Bluetooth, AUX, and more).
+* **Device & Entity Management:** Clean integration as a fully registered device, including a unique `unique_id` and device information.
+* **Modern Branding:** Includes a custom logo for a seamless look and feel in Home Assistant.
 
 ---
 
 ## Installation
 
-### Option 1: Über HACS (Empfohlen)
-1. Öffne HACS in deinem Home Assistant.
-2. Klicke oben rechts auf die drei Punkte und wähle **Benutzerdefinierte Repositories** (Custom Repositories).
-3. Füge die URL deines GitHub-Repositories (`schnax3/ui_proto_radio`) hinzu und wähle als Kategorie **Integration**.
-4. Suche nach **UIProto Internet Radio** in HACS, klicke auf Herunterladen und starte Home Assistant neu.
+### Option 1: Via HACS (Recommended)
 
-### Option 2: Manuelle Installation
-1. Lade den Ordner `ui_proto_radio` aus diesem Repository herunter.
-2. Kopiere den gesamten Ordner auf deinem Home Assistant Server in das Verzeichnis `/config/custom_components/`.
-3. Starte Home Assistant neu.
+1. Open HACS in Home Assistant.
+2. Click the three dots in the top-right corner and select **Custom repositories**.
+3. Add your GitHub repository URL (`schnax3/ui_proto_radio`) and select **Integration** as the category.
+4. Search for **UIProto Internet Radio** in HACS, click **Download**, and restart Home Assistant.
 
----
+### Option 2: Manual Installation
 
-## Einrichtung
-
-1. Gehe in Home Assistant auf **Einstellungen** $\rightarrow$ **Geräte & Dienste**.
-2. Klicke unten rechts auf **Integration hinzufügen**.
-3. Suche nach **UIProto Internet Radio** und klicke darauf.
-4. Gib die IP-Adresse deines Radios (z. B. `192.168.178.33`) ein. Fertig!
+1. Download the `ui_proto_radio` folder from this repository.
+2. Copy the entire folder to the `/config/custom_components/` directory on your Home Assistant server.
+3. Restart Home Assistant.
 
 ---
 
-## Dashboard-Empfehlung
+## Setup
 
-Für die optimale Steuerung empfiehlt sich eine maßgeschneiderte `custom:button-card`-Fernbedienung im Dashboard, die alle Schnellzugriffe auf Quellen und Navigation direkt bereitstellt.
+1. In Home Assistant, navigate to **Settings** → **Devices & Services**.
+2. Click **Add Integration** in the bottom-right corner.
+3. Search for **UIProto Internet Radio** and select it.
+4. Enter your radio's IP address (e.g. `192.168.178.33`). That's it!
 
-##
-Thanks, to erveryone that helped my build this Project
-@My Brother
+---
+
+## Dashboard Recommendation
+
+For the best user experience, we recommend using a custom `custom:button-card` remote control in your dashboard, providing quick access to all sources and navigation controls.
+
+---
+
+## Acknowledgements
+
+Thanks to everyone who helped me build this project!
+
+Special thanks to:
+- @My Brother
