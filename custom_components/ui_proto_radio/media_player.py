@@ -28,7 +28,7 @@ MAX_VOLUME = 31
 SOURCE_MAPPING = {
     "Internet Radio": 52,
     "Spotify Connect": 136,
-    "Media-Center": 2,
+    "Media-Center": 51,
     "UPnP": 8,
     "USB": 122,
     "DAB/DAB+": 91,
